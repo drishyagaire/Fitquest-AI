@@ -1,38 +1,100 @@
-import { type User, type InsertUser } from "@shared/schema";
-import { randomUUID } from "crypto";
-
-// modify the interface with any CRUD methods
-// you might need
+import { db } from "./db";
+import {
+  users, activities, foods, goals, achievements,
+  type User, type InsertUser,
+  type Activity, type InsertActivity,
+  type Food, type InsertFood,
+  type Goal, type InsertGoal,
+  type Achievement
+} from "@shared/schema";
+import { eq, desc } from "drizzle-orm";
 
 export interface IStorage {
-  getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
+  // User
+  getUser(id: number): Promise<User | undefined>;
+  updateUser(id: number, updates: Partial<InsertUser>): Promise<User>;
   createUser(user: InsertUser): Promise<User>;
+
+  // Activities
+  getActivities(userId: number): Promise<Activity[]>;
+  createActivity(activity: InsertActivity): Promise<Activity>;
+
+  // Foods
+  getFoods(userId: number): Promise<Food[]>;
+  createFood(food: InsertFood): Promise<Food>;
+
+  // Goals
+  getGoals(userId: number): Promise<Goal[]>;
+  createGoal(goal: InsertGoal): Promise<Goal>;
+  toggleGoal(id: number): Promise<Goal | undefined>;
+
+  // Achievements
+  getAchievements(userId: number): Promise<Achievement[]>;
+  createAchievement(achievement: Omit<Achievement, "id">): Promise<Achievement>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<string, User>;
-
-  constructor() {
-    this.users = new Map();
-  }
-
-  async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
-  }
-
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
-  }
-
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
+export class DatabaseStorage implements IStorage {
+  async getUser(id: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;
   }
+
+  async createUser(user: InsertUser): Promise<User> {
+    const [newUser] = await db.insert(users).values(user).returning();
+    return newUser;
+  }
+
+  async updateUser(id: number, updates: Partial<InsertUser>): Promise<User> {
+    const [updated] = await db.update(users).set(updates).where(eq(users.id, id)).returning();
+    return updated;
+  }
+
+  async getActivities(userId: number): Promise<Activity[]> {
+    return await db.select().from(activities).where(eq(activities.userId, userId)).orderBy(desc(activities.date));
+  }
+
+  async createActivity(activity: InsertActivity): Promise<Activity> {
+    const [newActivity] = await db.insert(activities).values(activity).returning();
+    return newActivity;
+  }
+
+  async getFoods(userId: number): Promise<Food[]> {
+    return await db.select().from(foods).where(eq(foods.userId, userId)).orderBy(desc(foods.date));
+  }
+
+  async createFood(food: InsertFood): Promise<Food> {
+    const [newFood] = await db.insert(foods).values(food).returning();
+    return newFood;
+  }
+
+  async getGoals(userId: number): Promise<Goal[]> {
+    return await db.select().from(goals).where(eq(goals.userId, userId));
+  }
+
+  async createGoal(goal: InsertGoal): Promise<Goal> {
+    const [newGoal] = await db.insert(goals).values(goal).returning();
+    return newGoal;
+  }
+
+  async toggleGoal(id: number): Promise<Goal | undefined> {
+    const [goal] = await db.select().from(goals).where(eq(goals.id, id));
+    if (!goal) return undefined;
+
+    const [updated] = await db.update(goals)
+      .set({ completed: !goal.completed })
+      .where(eq(goals.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getAchievements(userId: number): Promise<Achievement[]> {
+    return await db.select().from(achievements).where(eq(achievements.userId, userId));
+  }
+
+  async createAchievement(achievement: Omit<Achievement, "id">): Promise<Achievement> {
+    const [newAchievement] = await db.insert(achievements).values(achievement).returning();
+    return newAchievement;
+  }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();
