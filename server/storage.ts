@@ -14,14 +14,17 @@ export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   updateUser(id: number, updates: Partial<InsertUser>): Promise<User>;
   createUser(user: InsertUser): Promise<User>;
+  findUserByUsername(username: string): Promise<User | undefined>; // ✅ added
 
   // Activities
   getActivities(userId: number): Promise<Activity[]>;
   createActivity(activity: InsertActivity): Promise<Activity>;
+  deleteActivity(id: number): Promise<boolean>; // ✅ added
 
   // Foods
   getFoods(userId: number): Promise<Food[]>;
   createFood(food: InsertFood): Promise<Food>;
+  deleteFood(id: number): Promise<boolean>; // ✅ added
 
   // Goals
   getGoals(userId: number): Promise<Goal[]>;
@@ -34,6 +37,7 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  // --- User Methods ---
   async getUser(id: number): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;
@@ -49,6 +53,12 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
+  async findUserByUsername(username: string): Promise<User | undefined> { // ✅ added
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
+  }
+
+  // --- Activity Methods ---
   async getActivities(userId: number): Promise<Activity[]> {
     return await db.select().from(activities).where(eq(activities.userId, userId)).orderBy(desc(activities.date));
   }
@@ -58,6 +68,12 @@ export class DatabaseStorage implements IStorage {
     return newActivity;
   }
 
+  async deleteActivity(id: number): Promise<boolean> { // ✅ added
+    const result = await db.delete(activities).where(eq(activities.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // --- Food Methods ---
   async getFoods(userId: number): Promise<Food[]> {
     return await db.select().from(foods).where(eq(foods.userId, userId)).orderBy(desc(foods.date));
   }
@@ -67,6 +83,12 @@ export class DatabaseStorage implements IStorage {
     return newFood;
   }
 
+  async deleteFood(id: number): Promise<boolean> { // ✅ added
+    const result = await db.delete(foods).where(eq(foods.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // --- Goal Methods ---
   async getGoals(userId: number): Promise<Goal[]> {
     return await db.select().from(goals).where(eq(goals.userId, userId));
   }
@@ -87,6 +109,7 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
+  // --- Achievement Methods ---
   async getAchievements(userId: number): Promise<Achievement[]> {
     return await db.select().from(achievements).where(eq(achievements.userId, userId));
   }

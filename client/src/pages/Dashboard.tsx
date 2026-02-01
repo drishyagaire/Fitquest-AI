@@ -92,7 +92,8 @@ export default function Dashboard() {
         <StatCard
           title="Workouts"
           value={weeklyWorkouts}
-          icon={<Dumbbell className="w-4 h-4" />}
+          icon={"🏋️"}
+
           description={`Goal: ${user.workoutsGoal}/week`}
           variant="default"
         />
