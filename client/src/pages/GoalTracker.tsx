@@ -1,4 +1,5 @@
 import { useGoals, useCreateGoal, useToggleGoal } from "@/hooks/use-goals";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

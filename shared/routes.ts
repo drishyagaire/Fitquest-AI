@@ -1,6 +1,16 @@
 import { z } from 'zod';
 import { insertUserSchema, insertActivitySchema, insertFoodSchema, insertGoalSchema, users, activities, foods, goals, achievements } from './schema';
 
+const nutritionEstimateSchema = z.object({
+  name: z.string(),
+  calories: z.number(),
+  protein: z.number(),
+  carbs: z.number(),
+  fats: z.number(),
+  matchedItems: z.array(z.string()),
+  notes: z.string().optional(),
+});
+
 export const errorSchemas = {
   validation: z.object({
     message: z.string(),
@@ -69,7 +79,19 @@ export const api = {
         400: errorSchemas.validation,
       },
     },
+    estimate: {
+      method: 'POST' as const,
+      path: '/api/foods/estimate',
+      input: z.object({
+        description: z.string().min(1),
+      }),
+      responses: {
+        200: nutritionEstimateSchema,
+        400: errorSchemas.validation,
+      },
+    },
   },
+
   goals: {
     list: {
       method: 'GET' as const,

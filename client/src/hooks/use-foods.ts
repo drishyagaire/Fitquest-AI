@@ -43,3 +43,23 @@ export function useCreateFood() {
     },
   });
 }
+export function useEstimateNutrition() {
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (description: string) => {
+      const payload = api.foods.estimate.input.parse({ description });
+      const res = await fetch(api.foods.estimate.path, {
+        method: api.foods.estimate.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) throw new Error("Failed to estimate nutrition");
+      return api.foods.estimate.responses[200].parse(await res.json());
+    },
+    onError: (err) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+}

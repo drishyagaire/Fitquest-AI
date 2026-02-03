@@ -1,9 +1,10 @@
-import { useFoods, useCreateFood } from "@/hooks/use-foods";
+import { useFoods, useCreateFood, useEstimateNutrition } from "@/hooks/use-foods";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Plus, Utensils } from "lucide-react";
+import { Loader2, Plus, Sparkles, Utensils } from "lucide-react";
 import { useState } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -15,6 +16,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
 
 const foodFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -29,7 +31,10 @@ type FoodFormValues = z.infer<typeof foodFormSchema>;
 export default function FoodTracker() {
   const { data: foods, isLoading } = useFoods();
   const createFood = useCreateFood();
+  const estimateNutrition = useEstimateNutrition();
+  const { toast } = useToast();
   const [open, setOpen] = useState(false);
+  const [description, setDescription] = useState("");
 
   const form = useForm<FoodFormValues>({
     resolver: zodResolver(foodFormSchema),
@@ -47,11 +52,43 @@ export default function FoodTracker() {
       onSuccess: () => {
         setOpen(false);
         form.reset();
+        setDescription("");
       },
     });
   };
 
-  if (isLoading) return <Loader2 className="w-8 h-8 animate-spin mx-auto mt-20 text-primary" />;
+  const handleEstimate = () => {
+    if (!description.trim()) {
+      toast({
+        title: "Add a description",
+        description: "Try something like '150g chicken with rice'.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    estimateNutrition.mutate(description, {
+      onSuccess: (estimate) => {
+        if (estimate.matchedItems.length === 0) {
+          toast({
+            title: "No matches found",
+            description: estimate.notes ?? "Try adding quantities like '2 eggs' or '150g chicken'.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        form.setValue("name", estimate.name, { shouldValidate: true });
+        form.setValue("calories", estimate.calories, { shouldValidate: true });
+        form.setValue("protein", estimate.protein, { shouldValidate: true });
+        form.setValue("carbs", estimate.carbs, { shouldValidate: true });
+        form.setValue("fats", estimate.fats, { shouldValidate: true });
+      },
+    });
+  };
+
+  if (isLoading)
+    return <Loader2 className="w-8 h-8 animate-spin mx-auto mt-20 text-primary" />;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -60,10 +97,13 @@ export default function FoodTracker() {
           <h1 className="text-3xl font-display font-bold text-glow-primary mb-2">Food Log</h1>
           <p className="text-muted-foreground">Track your fuel.</p>
         </div>
-        
+
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-[0_0_20px_-5px_hsl(var(--primary))]">
+            <Button
+              size="lg"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-[0_0_20px_-5px_hsl(var(--primary))]"
+            >
               <Plus className="w-5 h-5 mr-2" /> Log Meal
             </Button>
           </DialogTrigger>
@@ -72,12 +112,49 @@ export default function FoodTracker() {
               <DialogTitle>Log Meal</DialogTitle>
             </DialogHeader>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-4">
+              {/* AI Meal Description */}
+              <div className="space-y-2">
+                <Label>Describe your meal (AI estimate)</Label>
+                <Textarea
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                  placeholder="e.g. 150g chicken breast with 1 cup rice"
+                  className="bg-background/50 min-h-[90px]"
+                />
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Tip: include quantities like grams or pieces.</span>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleEstimate}
+                    disabled={estimateNutrition.isPending}
+                    className="gap-2"
+                  >
+                    {estimateNutrition.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-4 h-4" />
+                    )}
+                    Estimate
+                  </Button>
+                </div>
+              </div>
+
+              {/* Food Name */}
               <div className="space-y-2">
                 <Label>Food Name</Label>
-                <Input {...form.register("name")} placeholder="e.g. Chicken Breast" className="bg-background/50" />
-                {form.formState.errors.name && <p className="text-destructive text-sm">{form.formState.errors.name.message}</p>}
+                <Input
+                  {...form.register("name")}
+                  placeholder="e.g. Chicken Breast"
+                  className="bg-background/50"
+                />
+                {form.formState.errors.name && (
+                  <p className="text-destructive text-sm">{form.formState.errors.name.message}</p>
+                )}
               </div>
-              
+
+              {/* Nutrition Inputs */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Calories</Label>
@@ -96,46 +173,9 @@ export default function FoodTracker() {
                   <Input type="number" {...form.register("fats")} className="bg-background/50" />
                 </div>
               </div>
-
-              <Button type="submit" disabled={createFood.isPending} className="w-full mt-4">
-                {createFood.isPending ? "Logging..." : "Add to Log"}
-              </Button>
             </form>
           </DialogContent>
         </Dialog>
-      </div>
-
-      <div className="grid gap-4">
-        {foods?.map((food) => (
-          <Card key={food.id} className="bg-card/50 border-white/5 hover:border-primary/30 transition-all duration-200">
-            <CardContent className="flex items-center justify-between p-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-secondary/10 rounded-full text-secondary">
-                  <Utensils className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-lg">{food.name}</h3>
-                  <div className="flex gap-3 text-sm text-muted-foreground font-mono">
-                    <span>P: {food.protein}g</span>
-                    <span>C: {food.carbs}g</span>
-                    <span>F: {food.fats}g</span>
-                  </div>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-2xl font-bold font-display text-primary">{food.calories}</div>
-                <div className="text-xs text-muted-foreground uppercase">kcal</div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-        {foods?.length === 0 && (
-          <div className="text-center py-20 border-2 border-dashed border-muted rounded-xl">
-            <Utensils className="w-12 h-12 mx-auto text-muted-foreground mb-4 opacity-50" />
-            <h3 className="text-xl font-bold text-muted-foreground">No food logged today</h3>
-            <p className="text-muted-foreground/60">Start tracking to see your stats!</p>
-          </div>
-        )}
       </div>
     </div>
   );
